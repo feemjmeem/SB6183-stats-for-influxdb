@@ -1,2 +1,3 @@
 bs4
-influxdb
+influxdb_client
+requests

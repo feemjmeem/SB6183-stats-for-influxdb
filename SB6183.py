@@ -2,8 +2,7 @@ import configparser
 import os
 import sys
 import argparse
-from influxdb import InfluxDBClient
-from influxdb.exceptions import InfluxDBClientError, InfluxDBServerError
+from influxdb_client import InfluxDBClient, WriteApi, WriteOptions
 import time
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -32,13 +31,11 @@ class configManager():
         self.output = self.config['GENERAL'].getboolean('Output', fallback=True)
 
         # InfluxDB
-        self.influx_address = self.config['INFLUXDB']['Address']
-        self.influx_port = self.config['INFLUXDB'].getint('Port', fallback=8086)
-        self.influx_database = self.config['INFLUXDB'].get('Database', fallback='cable_modem_stats')
-        self.influx_user = self.config['INFLUXDB'].get('Username', fallback='')
-        self.influx_password = self.config['INFLUXDB'].get('Password', fallback='')
-        self.influx_ssl = self.config['INFLUXDB'].getboolean('SSL', fallback=False)
-        self.influx_verify_ssl = self.config['INFLUXDB'].getboolean('Verify_SSL', fallback=True)
+        self.influx_url = self.config['INFLUXDB'].get('URL', fallback='http://localhost:8086')
+        self.influx_bucket = self.config['INFLUXDB'].get('Bucket', fallback='cable_modem_stats')
+        self.influx_org = self.config['INFLUXDB'].get('Org')
+        self.influx_token = self.config['INFLUXDB'].get('Token')
+        self.influx_verify_ssl = self.config['INFLUXDB'].getboolean('Verify_SSL', fallback='True')
 
         # Cable Modem
         self.modem_url = self.config['MODEM'].get('URL', fallback='http://192.168.100.1/RgConnect.asp')
@@ -50,14 +47,12 @@ class InfluxdbModem():
         self.config = configManager(config=config)
         self.output = self.config.output
         self.influx_client = InfluxDBClient(
-            self.config.influx_address,
-            self.config.influx_port,
-            username=self.config.influx_user,
-            password=self.config.influx_password,
-            database=self.config.influx_database,
-            ssl=self.config.influx_ssl,
+            url=self.config.influx_url,
+            token=self.config.influx_token,
+            org=self.config.influx_org,
             verify_ssl=self.config.influx_verify_ssl
         )
+        self.influx_write = self.influx_client.write_api()
         self.modem_url = self.config.modem_url
 
     def parse_modem(self):
@@ -155,27 +150,9 @@ class InfluxdbModem():
         """
         # if self.output:
         #     print(json_data)
-
-        try:
-            self.influx_client.write_points(json_data)
-        except (InfluxDBClientError, ConnectionError, InfluxDBServerError) as e:
-            if hasattr(e, 'code') and e.code == 404:
-
-                print('Database {} Does Not Exist.  Attempting To Create'.format(self.config.influx_database))
-
-                # TODO Grab exception here
-                self.influx_client.create_database(self.config.influx_database)
-                self.influx_client.write_points(json_data)
-
-                return
-
-            print('ERROR: Failed To Write To InfluxDB')
-            print(e)
-
-        if self.output:
-            print('Written To Influx: {}'.format(json_data))
-
-
+        
+        self.influx_write.write(self.config.influx_bucket, self.config.influx_org, json_data)
+        
 def main():
 
     parser = argparse.ArgumentParser(description="A tool to send modem stats statistics to InfluxDB")
