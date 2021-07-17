@@ -1,11 +1,14 @@
 # SB6183 Modem Stats emitted to Influxdb running as a Docker container
 
-![Screenshot](https://i.imgur.com/ppZjnkP.png)
+![Screenshot](https://i.imgur.com/wQnXPxU.png)
 
-This tool is a parser of the Arris SB6183 cable modem to emit signal & power metrics to InfluxDB
+This tool is a parser of the Arris SB6183 cable modem to emit signal & power metrics to InfluxDB, modified from the original by @billimek.
+
+Note: This fork has been modified to use InfluxDB 2. A telegraf configuration file is also included for outbound ping tests to correlate with modem issues. There is currently no error handling, so if your modem goes offline or is rebooted frequently, you will need to schedule this docker container to automatically restart.
 
 ## Grafana dashboard example
-See this [example json](sb6183-modem-stats.json) for a grafana dashboard as shown in the screenshot above
+See this [example json](sb6183-modem-stats.json) for a grafana dashboard as shown in the screenshot above.
+You will also need to set up the data sources in grafana as `cable_modem` and `ping` for this script and the telegraf config respectively.
 
 ## Configuration within config.ini
 
@@ -13,23 +16,22 @@ See this [example json](sb6183-modem-stats.json) for a grafana dashboard as show
 |Key            |Description                                                                                                         |
 |:--------------|:-------------------------------------------------------------------------------------------------------------------|
 |Delay          |Delay between runs                                                                                                  |
-|Output         |Write console output while tool is running                                                                          |
+|Output         |Write console output while tool is running (deprecated, TODO: fix)                                                  |
 #### INFLUXDB
 |Key            |Description                                                                                                         |
 |:--------------|:-------------------------------------------------------------------------------------------------------------------|
-|Address        |Delay between updating metrics                                                                                      |
-|Port           |InfluxDB port to connect to.  8086 in most cases                                                                    |
-|Database       |Database to write collected stats to                                                                                |
-|Username       |User that has access to the database                                                                                |
-|Password       |Password for above user                                                                                             |
+|URL            |InfluxDB URL (e.g. `http://192.168.0.50:8086`)                                                                      |
+|Bucket         |Bucket to write collected stats to                                                                                  |
+|Org            |InfluxDB organization                                                                                               |
+|Token          |Token providing write access to the bucket                                                                          |
 #### MODEM
 |Key            |Description                                                                                                         |
 |:--------------|:-------------------------------------------------------------------------------------------------------------------|
-|URL         |URL of the cable modem info page.  Leave blank for http://192.168.100.1/RgConnect.asp                                                            |
+|URL            |URL of the cable modem info page.  Leave blank for http://192.168.100.1/RgConnect.asp                               |
 
 ## Usage
 
-Before the first use run pip3 install -r requirements.txt
+If running from console, before the first use run `pip3 install -r requirements.txt` or `pipenv install`
 
 Enter your desired information in config.ini and run SB6183.py
 
@@ -37,41 +39,35 @@ Optionally, you can specify the --config argument to load the config file from a
 
 ***Requirements***
 
-Python 3+
+Python 3+ (tested on Python 3.9)
 
-You will need the influxdb library installed to use this - [Found Here](https://github.com/influxdata/influxdb-python)
+You will need the influxdb2 client library installed to use this - [Found Here](https://github.com/influxdata/influxdb-client-python)
 
 ## Docker Setup
 
 1. Install [Docker](https://www.docker.com/)
 
-2. Make a directory to hold the config.ini file. Navigate to that directory and download the sample config.ini in this repo.
-
+2. Clone this repository.
 ```bash
-mkdir SB6183-stats-for-influxdb
-curl -O https://raw.githubusercontent.com/billimek/SB6183-stats-for-influxdb/blob/master/config.ini SB6183-stats-for-influxdb/config.ini
-cd SB6183-stats-for-influxdb
+git clone https://github.com/feemjmeem/SB6183-stats-for-influxdb.git
 ```
 
-3. Modify the config file with your influxdb settings.
+3. Modify `config.ini` file with your influxdb settings.
 
 ```bash
 vim config.ini
 ```
 
-Modify the 'Address =' line include the ip or hostname of your influxdb instance.
+4. Modify the 'URL =' line include the URL to your InfluxDB instance.
 Example:
 
 ```bash
-Address = 10.13.14.200
+URL = http://192.168.0.50:8086
 ```
 
-. Run the container, pointing to the directory with the config file. This should now pull the image from Docker hub. You can do this by either running docker run or by using docker-compose.
+5. Build and run the container from the directory into which you cloned the repository.
 
 ```bash
-docker run -d \
---name="sb6183" \
--v $PWD/config.ini:/src/config.ini \
---restart="always" \
-billimek/sb6183-for-influxdb
+docker build .
+docker run sb6183
 ```
