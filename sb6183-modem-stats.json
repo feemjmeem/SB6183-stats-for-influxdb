@@ -495,12 +495,12 @@
     "list": []
   },
   "time": {
-    "from": "now-3h",
+    "from": "now-12h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Cable Modem",
   "uid": "GgQQMrz7z",
-  "version": 14
+  "version": 15
 }
